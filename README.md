@@ -112,15 +112,15 @@
 
 | Label | Score range | The exact text a reader sees |
 |---|---|---|
-| high-confidence human |  |  |
-| unsure |  |  |
-| high-confidence AI |  |  |
+| high-confidence human | 0.00 <= score < 0.40 | "This writing appears natural and human-authored. No further verification is needed." |
+| unsure | 0.40 <= score <= 0.60 | "Our automated checks found mixed signals in this text. If this was flagged by mistake, you can submit an appeal for human review." |
+| high-confidence AI | 0.60 < score <= 1.00 | "This text closely matches patterns commonly produced by AI models. If this is an error, please file an appeal." |
 
 **Why I worded the "unsure" one this way:**
 <!-- It's the hardest of the three. It has to admit uncertainty without
      sounding like an accusation, because the person reading it may well have
      written every word themselves. -->
-
+It explicitly avoids accusatory language, acknowledges system limitations, and gives the writer a clear, non-stressful path to appeal.
 
 
 ---
@@ -138,30 +138,34 @@
      diagnostics. -->
 
 ```bash
-$ curl.exe -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" -d '{\"text\": \"I wanted to share a quick update on our project timeline.\", \"creator_id\": \"giao_1\"}'
+$ curl.exe -X POST [http://127.0.0.1:5000/submit](http://127.0.0.1:5000/submit) -H "Content-Type: application/json" -d '{"text": "I wrote this quick update on our project timeline completely by hand.", "creator_id": "giao_1"}'
 ```
 
 ```json
 {
+  "combined_score": 0.1619,
   "confidence": 0.0,
-  "content_id": "9da9ad7e-69f6-40fc-8a34-b1c06b8bfe85",
-  "guess": "pending",
-  "label": "pending",
-  "model_score": 0.5636,
-  "style_score": 0.0
+  "content_id": "a66bd206-2bd6-47ad-8515-02f8e054fdba",
+  "guess": "human",
+  "label": "We think this was probably written by a person.",
+  "model_score": 0.1619,
+  "style_score": 0.5807
 }
 ```
 
 **An appeal**
 
 ```bash
-$ curl -X POST http://127.0.0.1:5000/appeal \
-  -H "Content-Type: application/json" \
-  -d '{"content_id": "...", "reasoning": "..."}'
+$$ curl.exe -X POST [http://127.0.0.1:5000/appeal](http://127.0.0.1:5000/appeal) -H "Content-Type: application/json" -d '{"content_id": "a66bd206-2bd6-47ad-8515-02f8e054fdba", "reasoning": "I wrote this entirely myself."}'
 ```
 
 ```json
-
+{
+  "content_id": "a66bd206-2bd6-47ad-8515-02f8e054fdba",
+  "message": "Your appeal has been received and logged for human review.",
+  "ok": true,
+  "status": "under_review"
+}
 ```
 
 **What the log shows afterwards**
@@ -171,20 +175,15 @@ $ curl.exe "http://127.0.0.1:5000/log?limit=1"
 ```
 
 ```json
-{
   "count": 1,
   "entries": [
     {
-      "combined_score": 0.5636,
-      "content_id": "9da9ad7e-69f6-40fc-8a34-b1c06b8bfe85",
+      "content_id": "a66bd206-2bd6-47ad-8515-02f8e054fdba",
       "creator_id": "giao_1",
-      "guess": "pending",
-      "label": "pending",
-      "model_score": 0.5636,
-      "status": "decided",
-      "style_score": 0.0,
-      "timestamp": "2026-11-04T01:40:46+00:00",
-      "word_count": 11
+      "event": "appeal",
+      "reasoning": "I wrote this entirely myself.",
+      "status": "under_review",
+      "timestamp": "2026-11-04T05:57:33+00:00"
     }
   ]
 }
