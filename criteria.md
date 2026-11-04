@@ -42,62 +42,57 @@ Two things worth knowing before you pick numbers:
   a **miss**.
 
 ---
-## 1.
+## 1. At most 1 of 10 plain human samples incorrectly flagged as AI across 3 seeds
 
 <!-- Your criterion. It must name a number. -->
-
-
+(False Positives)
 
 **Why this target:**
-
+Because `detector.py` uses GPT-2 perplexity, it naturally rewards simple vocabulary and short sentences. Since plain human writing is the primary victim of false positives, holding a strict 10% ceiling ensures my threshold won't disproportionately penalize writers with simpler or non-native styling.
 
 
 ---
 
-## 2.
+## 2. All 3 labels triggered at least once across a 15-item test suite
 
 <!-- Your criterion. -->
-
-
+(Label Coverage)
 
 **Why this target:**
-
+A safety layer with an `unsure` band is useless if it never triggers. This criterion forces my combined score thresholds in `scoring.py` to be wide enough to capture genuine gray areas rather than snapping everything into binary black-and-white.
 
 
 ---
 
-## 3.
+## 3. 100% success rate logging valid `POST /appeal` requests to audit logs
 
 <!-- Your criterion. -->
-
-
+(Appeal Path Reliability)
 
 **Why this target:**
-
+False accusations are inevitable in automated detection. If a writer pushes back, the audit trail must reliably capture their defense without crashing or failing to write to the local `logs/audit.jsonl` file.
 
 
 ---
 
-## 4.
+## 4. HTTP 400 response and zero perplexity calls for sub-3-word or empty input
 
 <!-- Your criterion. -->
-
-
+(Bad Input & Edge Cases Safety)
 
 **Why this target:**
-
+Feeding micro-lengths or empty strings into the GPT-2 tokenizer causes math errors or broken token shapes. Guarding the route prevents wasted compute cycles and prevents the log file from filling with junk data.
 
 
 ---
 
-## 5.
+## 5. At least 0.40 mean score gap between default AI and human calibration inputs
 
 <!-- Your criterion. -->
-
-
+(Score Spread Separation)
 
 **Why this target:**
-
+If my `detector.py` perplexity score and `stylometry.py` features don't create a clean mathematical separation between human and machine patterns, the default threshold of 0.78 will constantly misclassify text, making the system unviable.
 
 
 ---
