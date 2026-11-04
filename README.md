@@ -84,9 +84,9 @@
 <!-- Write the rule in words, then give the numbers. What happens when the two
      signals disagree? -->
 
-**The rule:**
+**The rule:** Use a 50/50 weighted average when signals align, but if they disagree by more than the split threshold, default to the more human-safe (lower) score to protect real writers from false positives.
 
-**The numbers:**
+**The numbers:** Weights = 0.5 model, 0.5 style; Split Threshold = 0.15.
 
 **Where it lives:** `scoring.py::combine_signals`
 
@@ -94,8 +94,12 @@
      somewhere else, say where. -->
 
 **A case where my two signals split, and what my rule does with it:**
-
-
+- **The text tested:** "I tell people that good politics doesnt negatively affect you, and as a normal person just living your life, you probably wont even notice it. But BAD politics will. Bad policies have to be so harmful that you actually feel their effects, lol. Good politics is like a guardian angel: its quietly working behind the scenes, doing its job without you even noticing. Bad politics, on the other hand, will slap you right in the face, lol."
+- **The signal scores:** 
+  - Model Signal: `0.6659` (leaning AI)
+  - Style Signal: `0.4561` (leaning human)
+- **The split gap:** The absolute difference between them was `0.2098`, which exceeds our `SPLIT_THRESHOLD` of `0.15`.
+- **What the rule did:** Because the gap was greater than 0.15, the conditional logic triggered and defaulted to the lower, more human-safe score (`0.4561`), preventing a false accusation and prioritizing protection for the human writer.
 
 ---
 
