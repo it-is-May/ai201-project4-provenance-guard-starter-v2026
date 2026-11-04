@@ -38,7 +38,19 @@
 
 <!-- The path a submission takes, from arriving to the label a reader sees.
      Six or seven steps — this is the trace you wrote in Milestone 1. -->
+**1. Request Received**: Client sends a `POST` request to `/submit` containing JSON (`text` and `creator_id`).
 
+**2. Validation:** `/submit` handler checks that `JSON` body contains valid text (e.g., minimum length check).
+
+**3. Signal 1 Evaluation (`detector.py`):** Runs the GPT-2 local model to measure text perplexity and outputs `model_score` (0.0 to 1.0).
+
+**4. Signal 2 Evaluation (`stylometry.py`):** Computes sentence length spread, type-token ratio, and punctuation density to output `style_score` (0.0 to 1.0).
+
+**5. Score Combination (`scoring.py`):** Combines `model_score` and `style_score` into a single `combined_score` via a weighted average. 
+
+**6. Label Classification and Response:** Maps `combined_score` against thresholds to select a human-readable label (high-confidence human, unsure, or high-confidence AI) and generates a unique `content_id`.
+
+**7. Audit Logging:** Writes the decision details to `logs/audit.jsonl` using `audit.py` and returns the structured `JSON` response to the client.
 
 
 ---
@@ -51,21 +63,21 @@
      The blind spot is not optional. If you can't name it you don't understand
      the signal yet — and unit 8's attack set is built out of blind spots. -->
 
-### Signal one — the model signal
+### Signal one — the model signal (`detector.py`)
 
-**What it measures:**
+**What it measures:** Text perplexity (how predictable/expected the text is to a language model like GPT-2).
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** AI models output average, predictable token sequences. Humans use surprising, erratic, or distinct phrasing.
 
-**What it can't see:**
+**What it can't see:** It rewards common words in short, plain sentences. Plain human writing (e.g., non-native English speakers, younger writers, simple prose) has low perplexity and gets falsely flagged as AI.
 
-### Signal two — the style signal
+### Signal two — the style signal (`stylometry.py`)
 
-**What it measures:**
+**What it measures:** Structural shape of text (sentence length variance/spread, vocabulary richness/TTR, punctuation density).
 
-**Why that might differ between human and AI writing:**
+**Why that might differ between human and AI writing:** AI text tends to have uniform sentence lengths and repetitive word variety. Human text is uneven and "lumpy".
 
-**What it can't see:**
+**What it can't see:** Meaning/semantics. Simple surface tweaks (like inserting intentional typos, adding quotations, or breaking sentences) alter the structural stats without changing content.
 
 ### The combining rule
 
