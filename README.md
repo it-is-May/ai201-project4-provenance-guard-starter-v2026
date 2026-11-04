@@ -195,15 +195,15 @@ $ curl.exe "http://127.0.0.1:5000/log?limit=1"
 
 **Moment 1**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* Assistance in setting up the initial stylometry function to calculate sentence length variance and type-token ratio.
+- *What came back:* A snippet utilizing standard string splitting and basic statistical variance calculations.
+- *What I changed:* Adjusted the tokenization logic to properly handle punctuation and edge cases with short sentences so it doesn't throw division-by-zero errors.
 
 **Moment 2**
 
-- *What I asked for:*
-- *What came back:*
-- *What I changed:*
+- *What I asked for:* Guidance on structuring the `/appeal` endpoint error handling when a `content_id` cannot be found in the audit log.
+- *What came back:* A conditional check using `audit.entries_for(content_id)` and returning a 404 response.
+- *What I changed:* Added extraction of the original `creator_id` from the log entry to fulfill the signature requirement of `audit.log_appeal()`.
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
