@@ -31,6 +31,10 @@ from flask import Flask, jsonify, request
 import audit
 import config
 
+import detector
+import stylometry
+import scoring
+
 app = Flask(__name__)
 
 
@@ -221,13 +225,12 @@ def submit():
     # 2. Generate a unique content ID
     content_id = str(uuid.uuid4())
 
-    # 3. Call the first signal (detector.py)
-    import detector
+    # 3. Call both signals
     model_score = detector.model_signal(text)
-
-    # 4. Placeholders for Milestone 4 & 5 (second signal, combined score, label)
-    style_score = 0.0
-    combined_score = model_score
+    style_score = stylometry.style_signal(text)
+  
+    # 4. Combine them using your split threshold rule
+    combined_score = scoring.combine_signals(model_score, style_score)
     guess = "pending"
     label = "pending"
     word_count = len(text.split())
@@ -253,6 +256,7 @@ def submit():
         "label": label,
         "model_score": model_score,
         "style_score": style_score,
+        "combined_score": combined_score,
     })
 
 
