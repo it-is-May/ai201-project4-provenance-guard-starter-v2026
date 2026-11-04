@@ -231,8 +231,7 @@ def submit():
   
     # 4. Combine them using your split threshold rule
     combined_score = scoring.combine_signals(model_score, style_score)
-    guess = "pending"
-    label = "pending"
+    guess, label = scoring.score_to_label(combined_score)
     word_count = len(text.split())
 
     # 5. Log every submission to logs/audit.jsonl via audit.py
@@ -263,31 +262,36 @@ def submit():
 @app.post("/appeal")
 def appeal():
     """
-    A writer says you got it wrong. ← TODO — Milestone 5
-
-    Expects JSON:
-        {"content_id": "...", "reasoning": "..."}
-
-    Should:
-      1. Check the content_id actually exists — `audit.entries_for(id)` tells
-         you. A typo here fails silently and looks like a broken endpoint,
-         which is the single most common way this milestone eats an hour.
-      2. Record the appeal with `audit.log_appeal(...)`, which moves the item
-         to `under_review`.
-      3. Confirm to the writer. No automatic re-checking needed.
-
-    This is the smallest endpoint in the project and the one that matters most
-    to the person on the other end. It's the only thing standing between a
-    wrong accusation and nothing at all.
+    A writer says you got it wrong.
     """
     payload = request.get_json(silent=True) or {}
+    content_id = payload.get("content_id")
+    reasoning = payload.get("reasoning", "")
 
-    # TODO: delete this and build the route.
+    if not content_id:
+        return jsonify({"error": "bad_request", "message": "Missing content_id."}), 400
+
+    # 1. Check if the content_id actually exists in the audit log
+    entries = audit.entries_for(content_id)
+    if not entries:
+        return jsonify({
+            "error": "not_found", 
+            "message": "No decision found for that content_id."
+        }), 404
+
+    # Get the creator_id from the original log entry
+    creator_id = entries[0].get("creator_id", "unknown")
+
+    # 2. Record the appeal with the required creator_id
+    audit.log_appeal(content_id=content_id, creator_id=creator_id, reasoning=reasoning)
+
+    # 3. Confirm to the writer
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /appeal isn't built yet — see the TODO in app.py.",
-        "you_sent": payload,
-    }), 501
+        "ok": True,
+        "content_id": content_id,
+        "status": "under_review",
+        "message": "Your appeal has been received and logged for human review."
+    })
 
 
 # ── Already works ─────────────────────────────────────────────────────────────
