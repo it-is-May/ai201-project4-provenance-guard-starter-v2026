@@ -202,14 +202,58 @@ def submit():
     payload = request.get_json(silent=True) or {}
 
     # TODO: delete this and build the route.
+    # return jsonify({
+    #     "error": "not_implemented",
+    #     "message": "POST /submit isn't built yet — see the TODO in app.py.",
+    #     "you_sent": {
+    #         "text_length": len(payload.get("text", "")),
+    #         "creator_id": payload.get("creator_id"),
+    #     },
+    # }), 501
+    # 1. Pull text and creator_id from the incoming JSON payload
+    text = payload.get("text", "")
+    creator_id = payload.get("creator_id", "anonymous")
+
+    # Guard for empty or missing text (fulfills your acceptance criteria)
+    if not text.strip():
+        return jsonify({"error": "bad_request", "message": "Text cannot be empty."}), 400
+
+    # 2. Generate a unique content ID
+    content_id = str(uuid.uuid4())
+
+    # 3. Call the first signal (detector.py)
+    import detector
+    model_score = detector.model_signal(text)
+
+    # 4. Placeholders for Milestone 4 & 5 (second signal, combined score, label)
+    style_score = 0.0
+    combined_score = model_score
+    guess = "pending"
+    label = "pending"
+    word_count = len(text.split())
+
+    # 5. Log every submission to logs/audit.jsonl via audit.py
+    audit.log_decision(
+        content_id=content_id,
+        creator_id=creator_id,
+        guess=guess,
+        model_score=model_score,
+        style_score=style_score,
+        combined_score=combined_score,
+        label=label,
+        status="decided",
+        word_count=word_count,
+    )
+
+    # 6. Return the structured JSON response containing the real model_score
     return jsonify({
-        "error": "not_implemented",
-        "message": "POST /submit isn't built yet — see the TODO in app.py.",
-        "you_sent": {
-            "text_length": len(payload.get("text", "")),
-            "creator_id": payload.get("creator_id"),
-        },
-    }), 501
+        "content_id": content_id,
+        "guess": guess,
+        "confidence": 0.0,
+        "label": label,
+        "model_score": model_score,
+        "style_score": style_score,
+    })
 
 
 @app.post("/appeal")
