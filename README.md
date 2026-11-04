@@ -134,13 +134,18 @@
      diagnostics. -->
 
 ```bash
-$ curl -X POST http://127.0.0.1:5000/submit \
-  -H "Content-Type: application/json" \
-  -d '{"text": "...", "creator_id": "..."}'
+$ curl.exe -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" -d '{\"text\": \"I wanted to share a quick update on our project timeline.\", \"creator_id\": \"giao_1\"}'
 ```
 
 ```json
-
+{
+  "confidence": 0.0,
+  "content_id": "9da9ad7e-69f6-40fc-8a34-b1c06b8bfe85",
+  "guess": "pending",
+  "label": "pending",
+  "model_score": 0.5636,
+  "style_score": 0.0
+}
 ```
 
 **An appeal**
@@ -158,11 +163,27 @@ $ curl -X POST http://127.0.0.1:5000/appeal \
 **What the log shows afterwards**
 
 ```bash
-$ curl "http://127.0.0.1:5000/log?limit=3"
+$ curl.exe "http://127.0.0.1:5000/log?limit=1"
 ```
 
 ```json
-
+{
+  "count": 1,
+  "entries": [
+    {
+      "combined_score": 0.5636,
+      "content_id": "9da9ad7e-69f6-40fc-8a34-b1c06b8bfe85",
+      "creator_id": "giao_1",
+      "guess": "pending",
+      "label": "pending",
+      "model_score": 0.5636,
+      "status": "decided",
+      "style_score": 0.0,
+      "timestamp": "2026-11-04T01:40:46+00:00",
+      "word_count": 11
+    }
+  ]
+}
 ```
 
 ---
