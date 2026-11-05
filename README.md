@@ -211,24 +211,53 @@ $ curl.exe "http://127.0.0.1:5000/log?limit=1"
 
 ## Rate Limiting
 
-**My limits:** ___ per minute, ___ per day
+**My limits:** 5 requests per minute, 100 requests per day
 
 **Why those numbers and not others:**
 <!-- Think about two people: a real writer submitting their own work a few
      times an hour, and a script sending a thousand variations to map your
      thresholds. Your numbers have to be liveable for the first and hostile to
      the second. -->
+A human writer drafting and manually submitting text for provenance analysis takes time to edit and review changes, rarely exceeding 2 to 4 submissions in a single minute. A low per-minute cap of 5 instantly blocks rapid automated script bursts trying to map scoring thresholds or flood the endpoint. Additionally, a ceiling of 100 requests per day accommodates intensive writing sessions where an author iteratively tests multiple chapters or paragraph variations throughout a long workday, providing ample headroom for normal daily use while protecting the service against sustained background scraping.
 
 **What a caller counts as:** <!-- per address, or per creator_id? They fail
 differently — one script can look like a thousand callers, and one household
 can look like one. -->
+Per `creator_id`. 
+
+- **Pros:** Isolates limits to individual user accounts. Unlike IP address-based limiting, it prevents an entire household, college dorm, or shared office network from being blocked if one legitimate user is heavy-testing their work.
+- **Cons:** It can be vulnerable to automated scripts that dynamically generate thousands of fake `creator_id` strings (e.g., `bot_001`, `bot_002`) to bypass the per-user rate limit. 
+- **Why I chose it:** Despite the spoofing vulnerability, tracking per `creator_id` makes the most sense for an authorship verification platform because it correctly ties submissions to user identity and avoids collateral damage on shared networks.
 
 **The run of status codes when I pushed past it:**
 
 <!-- python run_attacks.py --flood 15 -->
 
 ```
+15 submissions as 'flood_tester' against http://127.0.0.1:5000
+The first one is slow while the model loads.
 
+  [ 1/15] 200
+  [ 2/15] 200
+  [ 3/15] 200
+  [ 4/15] 200
+  [ 5/15] 200
+  [ 6/15] 429
+  [ 7/15] 429
+  [ 8/15] 429
+  [ 9/15] 429
+  [10/15] 429
+  [11/15] 429
+  [12/15] 429
+  [13/15] 429
+  [14/15] 429
+  [15/15] 429
+
+============================================================
+200 200 200 200 200 429 429 429 429 429 429 429 429 429 429
+============================================================
+
+10 of 15 were rate limited.
 ```
 
 ---
