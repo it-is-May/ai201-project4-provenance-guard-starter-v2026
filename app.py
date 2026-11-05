@@ -155,7 +155,7 @@ def health():
 # ── YOU BUILD THIS ────────────────────────────────────────────────────────────
 
 @app.post("/submit")
-# @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
+@limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
 def submit():
     """
     Take a piece of text, decide about it, log the decision, answer.
@@ -220,6 +220,7 @@ def submit():
 
     # Guard for empty or missing text (fulfills your acceptance criteria)
     if not text.strip():
+        audit.log_rejection(creator_id=creator_id, reason="empty_text")
         return jsonify({"error": "bad_request", "message": "Text cannot be empty."}), 400
 
     # 2. Generate a unique content ID
