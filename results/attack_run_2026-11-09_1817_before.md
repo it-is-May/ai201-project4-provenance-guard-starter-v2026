@@ -57,7 +57,7 @@ audit log when you go looking for the ten entries to paste.
 | RQ07 | malformed | body is a JSON array, not an object | 500 | `—` | — | — | BROKE |
 | RQ08 | malformed | body is unparseable JSON | 400 | `—` | — | — | HELD |
 | RQ09 | malformed | body is empty | 400 | `—` | — | — | HELD |
-| RQ10 | malformed | body is form-encoded, not JSON | 429 | `—` | — | — |  |
+| RQ10 | malformed | body is form-encoded, not JSON | 429 | `—` | — | — | HELD |
 | RQ11 | malformed | body is JSON claiming to be plain text | 429 | `—` | — | — | HELD |
 | RQ12 | malformed | deeply nested JSON | 500 | `—` | — | — | BROKE |
 | FL01_01 | flood_same_creator | 20 rapid submissions from one creator | 200 | `4ac4a3c6-7772-4717-acd6-f11cfd7751a0` | human | 0.000 | HELD |
