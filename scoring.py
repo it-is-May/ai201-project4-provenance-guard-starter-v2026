@@ -32,7 +32,7 @@ def combine_signals(model_score: float, style_score: float) -> float:
         raise ValueError("Scores must be between 0.0 and 1.0")
 
     diff = abs(model_score - style_score)
-    split_threshold = getattr(config, "SPLIT_THRESHOLD", 0.15)
+    split_threshold = getattr(config, "SPLIT_THRESHOLD", 0.18)
 
     if diff > split_threshold:
         # Disagreement split detected: favor the human-safe (lower) score 
