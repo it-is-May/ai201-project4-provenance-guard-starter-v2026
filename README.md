@@ -175,6 +175,7 @@ $ curl.exe "http://127.0.0.1:5000/log?limit=1"
 ```
 
 ```json
+{
   "count": 1,
   "entries": [
     {
@@ -188,22 +189,6 @@ $ curl.exe "http://127.0.0.1:5000/log?limit=1"
   ]
 }
 ```
-
----
-
-## How I Used AI
-
-**Moment 1**
-
-- *What I asked for:* Assistance in setting up the initial stylometry function to calculate sentence length variance and type-token ratio.
-- *What came back:* A snippet utilizing standard string splitting and basic statistical variance calculations.
-- *What I changed:* Adjusted the tokenization logic to properly handle punctuation and edge cases with short sentences so it doesn't throw division-by-zero errors.
-
-**Moment 2**
-
-- *What I asked for:* Guidance on structuring the `/appeal` endpoint error handling when a `content_id` cannot be found in the audit log.
-- *What came back:* A conditional check using `audit.entries_for(content_id)` and returning a 404 response.
-- *What I changed:* Added extraction of the original `creator_id` from the log entry to fulfill the signature requirement of `audit.log_appeal()`.
 
 <!-- ═══════════════════════ UNIT 8 — THE TEST ═══════════════════════ -->
 
@@ -1060,15 +1045,40 @@ It did not help as the mean score gap remained consistently. The combined scores
 
 <!-- For each attack still getting through and each criterion still missed:
      what you'd do, and why you stopped. -->
-
+The improvement did not change any diagnosed issues. I am stopping because of time constraints. To handle 500 error code, I would add exception handling to those data types. For Criterion #3, I would add an independent automation script to evaluate it. For Criterion #5, I would try out wider range of split thresholds. 
 
 
 **The trade I'd make if this ran for real:**
 
 <!-- Two sentences. Fewer wrong accusations means more AI text getting through.
      Say which way you'd go and WHO PAYS FOR IT. -->
+I choose to bias the system toward protecting human writers by keeping safety overrides strict, even though it allows more AI text to slip through the unsure band. In this trade-off, platform readers and downstream consumers pay the price by occasionally seeing unflagged AI text, rather than forcing innocent human writers to pay the price through false accusations.
 
+---
 
+## How I Used AI
+
+**Moment 1**
+
+- *What I asked for:* Assistance in setting up the initial stylometry function to calculate sentence length variance and type-token ratio.
+- *What came back:* A snippet utilizing standard string splitting and basic statistical variance calculations.
+- *What I changed:* Adjusted the tokenization logic to properly handle punctuation and edge cases with short sentences so it doesn't throw division-by-zero errors.
+
+**Moment 2**
+
+- *What I asked for:* Guidance on structuring the `/appeal` endpoint error handling when a `content_id` cannot be found in the audit log.
+- *What came back:* A conditional check using `audit.entries_for(content_id)` and returning a 404 response.
+- *What I changed:* Added extraction of the original `creator_id` from the log entry to fulfill the signature requirement of `audit.log_appeal()`.
+
+**Moment 3**
+- *What I asked for:* Computation and analysis of the mean score gaps across evaluation runs to determine why adjusting the split threshold from 0.15 to 0.18 failed to shift the metrics.
+- *What came back:* Quantitative calculations of the score distributions and score gaps, revealing that individual divergences clustered either well below or far outside the threshold window.
+- *What I changed:* Used those exact calculated metrics to document the threshold limitations in my evaluation notes, explaining why minor adjustments couldn't bridge the gap toward the 0.40 target.
+
+**Moment 4**
+- *What I asked for:* A comparative analysis of multiple attack run logs (`attack_run_2026-11-09_1817_before.md` and subsequent after-runs) to evaluate service stability across 56 test cases.
+- *What came back:* A breakdown showing that HTTP statuses, guesses, model scores, style scores, and labels remained identical, while only timestamps, execution dates, and unique content ID UUIDs changed.
+- *What I changed:* Documented the exact behavior of the 56 attacks across categories (evasion, false positives, prompt injections, malformed inputs, and floods) to separate true failures from metadata variations.
 
 <!-- ═════════════════════════════════════════════════════════════════════
 
