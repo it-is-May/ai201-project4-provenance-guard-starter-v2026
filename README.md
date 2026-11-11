@@ -309,7 +309,7 @@ The first one is slow while the model loads.
 | RQ07 | malformed | body is a JSON array, not an object | 500 | `—` | — | — | BROKE |
 | RQ08 | malformed | body is unparseable JSON | 400 | `—` | — | — | HELD |
 | RQ09 | malformed | body is empty | 400 | `—` | — | — | HELD |
-| RQ10 | malformed | body is form-encoded, not JSON | 429 | `—` | — | — |  |
+| RQ10 | malformed | body is form-encoded, not JSON | 429 | `—` | — | — | HELD |
 | RQ11 | malformed | body is JSON claiming to be plain text | 429 | `—` | — | — | HELD |
 | RQ12 | malformed | deeply nested JSON | 500 | `—` | — | — | BROKE |
 | FL01_01 | flood_same_creator | 20 rapid submissions from one creator | 200 | `4ac4a3c6-7772-4717-acd6-f11cfd7751a0` | human | 0.000 | HELD |
@@ -364,7 +364,7 @@ A false positive where a genuine human writer's submission (such as a formal ess
 | 2. label coverage | 3 of 3 | 3/3 | 3/3 | 3/3 | MET |
 | 4. bad input handling | 5/5 | 5/5 | 5/5 | 5/5 | MET |
 | 3. appeal path logging | - | - | - | - | UNMEASURABLE |
-| 5. score spread separation | >= 0.40 | 0.325  | 0.325 | 0.325  | MISSED |
+| 5. score spread separation | >= 0.40 | 0.296  | 0.296 | 0.296  | MISSED |
 
 **Real output from one trial**, pasted as text, naming the file and function
 that produced it:
@@ -677,7 +677,7 @@ that produced it:
 
 Criterion #5 Miss (Score Spread Separation)
 - **Stage:** The combining rule and signal two (`scoring.py::combine_signals` and `stylometry.py`).
-- **Mechanism:** The strict split threshold ($0.15$) and safety override mechanism default ambiguous text scores toward the lower, human-safe bound. This compresses the score distribution across both sets, resulting in a mean score gap of 0.325 rather than the targeted 0.40.
+- **Mechanism:** The strict split threshold ($0.15$) and safety override mechanism default ambiguous text scores toward the lower, human-safe bound. This compresses the score distribution across both sets, resulting in a mean score gap of 0.296 rather than the targeted 0.40.
 
 Criterion #3 Unmeasurable (Appeal Path Logging)
 - **Stage:** The test harness and route (`run_eval.py` and `app.py::appeal`).
@@ -691,22 +691,368 @@ Broken Attacks (MF02, RQ03, RQ04, RQ05, RQ07, RQ12 — HTTP 500 Errors)
 
 ## The Improvement
 
-**What I changed:**
+**What I changed:** I changed the split threshold from 0.15 to 0.10 then to 0.18.
 
-**Which diagnosis pointed at it:**
+**Which diagnosis pointed at it:** I attempted to fix Criterion #5 (score spread separation)
 
 ### Attack Run — After
 
 <!-- Same format. `run_attacks.py --label after` -->
+| ID | Family | Targeting | Status | Content ID | Guess | Score | Verdict |
+|---|---|---|---|---|---|---|---|
+| EV01 | evasion | signal two: typos raise word variety | 200 | `81a78d7e-f1c2-4c8a-ad1a-da2585c15838` | human | 0.000 | HELD |
+| EV02 | evasion | signal two: broken-up sentences raise length spread | 200 | `ad3c4bc3-4d97-4662-997e-17e1a7be734d` | human | 0.000 | HELD |
+| EV03 | evasion | signal two: a pasted quotation changes the shape | 200 | `c9cb61d7-8172-4056-b5f6-212fd7ce6054` | unsure | 0.000 | HELD |
+| EV04 | evasion | signal one: unusual words raise perplexity | 200 | `173be714-4d4d-49d5-99bc-8a7fd1db56be` | unsure | 0.000 | HELD |
+| EV05 | evasion | both signals: heavy human editing pass | 200 | `90bb47d4-696f-4624-a8d9-22a64f36c645` | human | 0.000 | HELD |
+| EV06 | evasion | signal two: one very long sentence and one very short | 200 | `ee09c97a-7359-40d4-b8b4-9089b1530c7d` | human | 0.000 | HELD |
+| EV07 | evasion | signal two: padding with punctuation | 200 | `9a4a17af-6abf-4bf0-bb69-16c2e809afc2` | unsure | 0.000 | HELD |
+| EV08 | evasion | signal one: text below the token window | 200 | `7d4d9105-06a8-47e3-851f-3d2bd4afd89f` | human | 0.000 | HELD |
+| EV09 | evasion | both: AI text with a human opening paragraph bolted on | 200 | `1eb369dd-ea20-4ed0-ae54-7e3726a00adc` | unsure | 0.000 | HELD |
+| EV10 | evasion | signal two: repeated stanza structure | 200 | `27209cdb-64b9-4b5d-95f3-7c31d9e1c854` | ai | 0.000 | HELD |
+| FP01 | false_positive | plain, clear human writing with no flourishes | 200 | `930075c1-b01e-432f-be6c-a43c792ce298` | unsure | 0.000 | HELD |
+| FP02 | false_positive | human writing in a formal register | 200 | `23b7273e-4db9-43de-a4e2-c207248ae69c` | unsure | 0.000 | HELD |
+| FP03 | false_positive | a non-native English speaker writing carefully | 200 | `5d19763b-faba-43e0-a9d7-70b654aa832e` | unsure | 0.000 | HELD |
+| FP04 | false_positive | a student essay written to a rubric | 200 | `340a802c-a2a1-4a08-bf5f-bc6b7e409e33` | unsure | 0.000 | HELD |
+| FP05 | false_positive | technical documentation written by a person | 200 | `76854ba0-8cf4-477d-83db-4b93c51b3621` | ai | 0.000 | HELD |
+| FP06 | false_positive | a person imitating a formal template | 200 | `a8f8fc69-2c99-46f7-be06-4f0f9b9fedab` | unsure | 0.000 | HELD |
+| FP07 | false_positive | human writing that repeats a phrase deliberately | 200 | `2cd786ed-bb9d-4e97-9062-977442a7643d` | unsure | 0.000 | HELD |
+| FP08 | false_positive | very short genuine human submission | 200 | `71b67403-1bcd-4e49-b0af-fbe324e150b8` | human | 0.000 | HELD |
+| PI01 | prompt_injection | instruction to ignore the check | 200 | `c7ace2aa-6d2e-4e58-9f60-75d60a126ae1` | unsure | 0.000 | HELD |
+| PI02 | prompt_injection | instruction disguised as a system message | 200 | `d49c5675-9171-47e6-b93b-fad551f96455` | human | 0.000 | HELD |
+| PI03 | prompt_injection | instruction wrapped in the writer's voice | 200 | `590e0847-4695-4f30-a129-50f49fc10c30` | unsure | 0.000 | HELD |
+| PI04 | prompt_injection | attempt to make the label text hostile | 200 | `dbd1b993-8890-42db-bcd2-ca2451dca4d7` | unsure | 0.000 | HELD |
+| PI05 | prompt_injection | attempt to inject into the audit log | 200 | `fa27b630-a8e1-4da3-8a71-b899f6e592f1` | human | 0.000 | HELD |
+| PI06 | prompt_injection | instruction plus real human text | 200 | `b7989b32-20ba-4a3f-bf71-3eb844202a2e` | unsure | 0.000 | HELD |
+| MF01 | malformed | text is only whitespace | 400 | `—` | — | — | HELD |
+| MF02 | malformed | text is a single character | 500 | `—` | — | — | BROKE |
+| MF03 | malformed | text is control characters | 200 | `61269c9f-e511-446d-83b2-81c61ba40978` | human | 0.000 | HELD |
+| MF04 | malformed | text is only punctuation | 200 | `87a54162-c981-4816-b013-2de13fe1c0ab` | human | 0.000 | HELD |
+| MF05 | malformed | text is a very long single word | 200 | `d485636c-4e30-4c28-8d41-fa6fc448fee8` | unsure | 0.000 | HELD |
+| MF06 | malformed | text is emoji only | 200 | `24cc8a5f-0700-4b35-b219-64348a8e9672` | ai | 0.000 | HELD |
+| MF07 | malformed | text is right-to-left script | 200 | `f9f6b6ae-46e4-42a3-99f5-66f345892f79` | ai | 0.000 | HELD |
+| MF08 | malformed | text is 60,000 characters | 200 | `ed4ebd8d-c596-4e8f-bc32-ad2524198426` | ai | 0.000 | HELD |
+| RQ01 | malformed | no text field at all | 400 | `—` | — | — | HELD |
+| RQ02 | malformed | no creator_id | 200 | `80d14c82-73bb-4394-89ec-aaab4ec3a9cb` | human | 0.000 | HELD |
+| RQ03 | malformed | text is a number | 500 | `—` | — | — | BROKE |
+| RQ04 | malformed | text is a list | 500 | `—` | — | — | BROKE |
+| RQ05 | malformed | text is null | 500 | `—` | — | — | BROKE |
+| RQ06 | malformed | creator_id is an object | 200 | `10a49a0d-4473-4309-ac1e-b15aacb8a454` | human | 0.000 | HELD |
+| RQ07 | malformed | body is a JSON array, not an object | 500 | `—` | — | — | BROKE |
+| RQ08 | malformed | body is unparseable JSON | 400 | `—` | — | — | HELD |
+| RQ09 | malformed | body is empty | 400 | `—` | — | — | HELD |
+| RQ10 | malformed | body is form-encoded, not JSON | 429 | `—` | — | — | HELD |
+| RQ11 | malformed | body is JSON claiming to be plain text | 429 | `—` | — | — | HELD |
+| RQ12 | malformed | deeply nested JSON | 500 | `—` | — | — | BROKE |
+| FL01_01 | flood_same_creator | 20 rapid submissions from one creator | 200 | `c43b3d7f-e84a-41aa-83f9-df790a33cc0a` | human | 0.000 | HELD |
+| FL01_02 | flood_same_creator | 20 rapid submissions from one creator | 200 | `f9f520c3-d43c-4930-9017-44abbb40453d` | human | 0.000 | HELD |
+| FL01_03 | flood_same_creator | 20 rapid submissions from one creator | 200 | `475ab4b1-703d-4d2a-9fbb-12141c6130b6` | human | 0.000 | HELD |
+| FL01_04 | flood_same_creator | 20 rapid submissions from one creator | 200 | `a10e2d29-05a6-4c3f-a772-f4e1e9c035b5` | human | 0.000 | HELD |
+| FL01_05 | flood_same_creator | 20 rapid submissions from one creator | 200 | `3aa294a1-b78b-4e45-9da0-33ef6fbefbc5` | human | 0.000 | HELD |
+| FL01_06 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — | HELD |
+| FL01_07 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — | HELD |
+| FL01_08 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — | HELD |
+| FL01_09 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — | HELD |
+| FL01_10 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — | HELD |
+| FL01_11 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — | HELD |
+| FL01_12 | flood_same_creator | 20 rapid submissions from one creator | 429 | `—` | — | — | HELD |
 
+### my own writing
 
+**Trial 1**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.0,
+    "model_score": 0.6525,
+    "style_score": 0.5716,
+    "label": "We think this was probably generated by an AI model. If this is an error, please file an appeal.",
+    "sent": "I prayed to God that He will lead us to where we belong, whether that "
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0,
+    "model_score": 0.0504,
+    "style_score": 0.5608,
+    "label": "We think this was probably written by a person.",
+    "sent": "I want peace and space for growth."
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.0,
+    "model_score": 0.7458,
+    "style_score": 0.5658,
+    "label": "We found mixed signals in this text, and we're not sure who wrote it. If this was flagged by mistake, you can submit an appeal for human review.",
+    "sent": "You know, when you see your loved ones doing well, it radiates that po"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0,
+    "model_score": 0.2727,
+    "style_score": 0.6,
+    "label": "We think this was probably written by a person.",
+    "sent": "Two peas in a pod"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.0,
+    "model_score": 0.3613,
+    "style_score": 0.4583,
+    "label": "We found mixed signals in this text, and we're not sure who wrote it. If this was flagged by mistake, you can submit an appeal for human review.",
+    "sent": "This year's midterm election, I generally think neither major parties "
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0,
+    "model_score": 0.2911,
+    "style_score": 0.5456,
+    "label": "We think this was probably written by a person.",
+    "sent": "You have a caring nature, which I really love it."
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.0,
+    "model_score": 0.6122,
+    "style_score": 0.4634,
+    "label": "We found mixed signals in this text, and we're not sure who wrote it. If this was flagged by mistake, you can submit an appeal for human review.",
+    "sent": "I like going to my church. I found a purpose there. It's actually quit"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0,
+    "model_score": 0.1256,
+    "style_score": 0.589,
+    "label": "We think this was probably written by a person.",
+    "sent": "I think of you whenever I go on hiking or just take morning walk that "
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.0,
+    "model_score": 0.7172,
+    "style_score": 0.4434,
+    "label": "We found mixed signals in this text, and we're not sure who wrote it. If this was flagged by mistake, you can submit an appeal for human review.",
+    "sent": "Love is a beautiful pain. I am willing to go through ups and downs in "
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.0,
+    "model_score": 0.5725,
+    "style_score": 0.442,
+    "label": "We found mixed signals in this text, and we're not sure who wrote it. If this was flagged by mistake, you can submit an appeal for human review.",
+    "sent": "Do I feel that all my prayers have been answered? I have yet to know. "
+  }
+]
+```
+### label coverage
+
+**Trial 1**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.0,
+    "model_score": 0.4586,
+    "style_score": 0.5897,
+    "label": "We found mixed signals in this text, and we're not sure who wrote it. If this was flagged by mistake, you can submit an appeal for human review.",
+    "sent": "The implementation of the proposed framework requires careful consider"
+  },
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.0,
+    "model_score": 0.6566,
+    "style_score": 0.5658,
+    "label": "We think this was probably generated by an AI model. If this is an error, please file an appeal.",
+    "sent": "I went outside for a walk this morning."
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0,
+    "model_score": 0.0514,
+    "style_score": 0.5804,
+    "label": "We think this was probably written by a person.",
+    "sent": "This text might have some mixed patterns or ambiguous elements here."
+  }
+]
+```
+### bad input handling
+
+**Trial 1**
+
+```json
+[
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "(empty text)"
+  },
+  {
+    "status": 400,
+    "guess": null,
+    "confidence": null,
+    "model_score": null,
+    "style_score": null,
+    "label": null,
+    "sent": "{\"creator_id\": \"eval_missing\"}"
+  },
+  {
+    "status": null,
+    "error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+    "sent": "test"
+  },
+  {
+    "status": null,
+    "error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+    "sent": "hello world"
+  },
+  {
+    "status": null,
+    "error": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+    "sent": "{\"text\": null, \"creator_id\": \"eval_null\"}"
+  }
+]
+```
+### appeal path logging
+
+**Trial 1**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0,
+    "model_score": 0.0271,
+    "style_score": 0.5852,
+    "label": "We think this was probably written by a person.",
+    "sent": "This text will be submitted to generate an ID for testing the appeal p"
+  }
+]
+```
+### score spread separation
+
+**Trial 1**
+
+```json
+[
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.0,
+    "model_score": 0.5027,
+    "style_score": 0.5365,
+    "label": "We found mixed signals in this text, and we're not sure who wrote it. If this was flagged by mistake, you can submit an appeal for human review.",
+    "sent": "I have plans for us, but without you, they are all meaningless."
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.0,
+    "model_score": 0.6809,
+    "style_score": 0.4854,
+    "label": "We found mixed signals in this text, and we're not sure who wrote it. If this was flagged by mistake, you can submit an appeal for human review.",
+    "sent": "The phrase 'I love you' for me includes several layers of meaning. It "
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0,
+    "model_score": 0.2783,
+    "style_score": 0.5671,
+    "label": "We think this was probably written by a person.",
+    "sent": "Quick reminder: the fastest way to reduce stress with work is finishin"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0,
+    "model_score": 0.2391,
+    "style_score": 0.4601,
+    "label": "We think this was probably written by a person.",
+    "sent": "People say that money goes then comes back. But I think my money has A"
+  },
+  {
+    "status": 200,
+    "guess": "ai",
+    "confidence": 0.0,
+    "model_score": 0.6721,
+    "style_score": 0.6049,
+    "label": "We think this was probably generated by an AI model. If this is an error, please file an appeal.",
+    "sent": "They say I was born from the stage, but I was actually born at the hos"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.0,
+    "model_score": 0.5563,
+    "style_score": 0.5865,
+    "label": "We found mixed signals in this text, and we're not sure who wrote it. If this was flagged by mistake, you can submit an appeal for human review.",
+    "sent": "The implementation of the proposed framework requires careful consider"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0,
+    "model_score": 0.3458,
+    "style_score": 0.5716,
+    "label": "We think this was probably written by a person.",
+    "sent": "Furthermore, it is important to analyze the overarching systemic impli"
+  },
+  {
+    "status": 200,
+    "guess": "unsure",
+    "confidence": 0.0,
+    "model_score": 0.4719,
+    "style_score": 0.5719,
+    "label": "We found mixed signals in this text, and we're not sure who wrote it. If this was flagged by mistake, you can submit an appeal for human review.",
+    "sent": "In conclusion, the data demonstrates a statistically significant corre"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0,
+    "model_score": 0.2202,
+    "style_score": 0.586,
+    "label": "We think this was probably written by a person.",
+    "sent": "Optimization algorithms facilitate enhanced performance across diverse"
+  },
+  {
+    "status": 200,
+    "guess": "human",
+    "confidence": 0.0,
+    "model_score": 0.0301,
+    "style_score": 0.586,
+    "label": "We think this was probably written by a person.",
+    "sent": "This methodology establishes a robust paradigm for scalable enterprise"
+  }
+]
+```
 
 **Did it help, and how do I know:**
 
 <!-- Widening the unsure band usually fixes one problem and creates another.
      Reporting that trade honestly is worth full credit. -->
 
-
+It did not help as the mean score gap remained consistently. The combined scores for each sample remained the same in the run logs. Therefore, it did not change the mean scores, which the gap was not changed. 
 
 ---
 
