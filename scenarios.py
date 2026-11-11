@@ -30,8 +30,16 @@ SCENARIOS = [
         # things you actually wrote. This is the criterion that matters most and
         # it's meaningless with someone else's prose.
         "texts": [
-            "REPLACE ME with a paragraph you wrote yourself.",
-            "REPLACE ME with another one. Ten pieces is the usual number.",
+            "I prayed to God that He will lead us to where we belong, whether that is together or separate.",
+            "I want peace and space for growth.",
+            "You know, when you see your loved ones doing well, it radiates that positive energy to you, which makes you happy too",
+            "Two peas in a pod",
+            "This year's midterm election, I generally think neither major parties are good. The middle class still suffers in this war among the rich and politicians. I can do so much by living up to my Catholic belief, being kind to those around me, maintaining my neutral position in politics.",
+            "You have a caring nature, which I really love it.",
+            "I like going to my church. I found a purpose there. It's actually quite nice to know more about God.",
+            "I think of you whenever I go on hiking or just take morning walk that how I can share this level of refreshness with you.",
+            "Love is a beautiful pain. I am willing to go through ups and downs in life with you. Maybe it is a selfish me that wants to stay with you even when you push me away.",
+            "Do I feel that all my prayers have been answered? I have yet to know. I got immediate answer for some of my prayers, but some require more time for me understand God's work behind the scene. All I can do is entrusting all my life, worries, and concerns into His Hand."
         ],
     },
     {
@@ -40,24 +48,49 @@ SCENARIOS = [
         # Inputs spread across your score range, so you can check all three
         # labels are actually reachable.
         "texts": [
-            "REPLACE ME with something you're confident is AI-generated.",
-            "REPLACE ME with something you're confident is human-written.",
-            "REPLACE ME with something genuinely borderline.",
+            "The implementation of the proposed framework requires careful consideration of several key statistical and computational factors.",
+            "I went outside for a walk this morning.",
+            "This text might have some mixed patterns or ambiguous elements here.",
         ],
     },
-    # A bad-input criterion looks like this. Uncomment and adjust if that's one
-    # of your five — these are raw request bodies, sent exactly as written.
-    #
-    # {
-    #     "name": "bad input",
-    #     "criterion": 3,
-    #     "bodies": [
-    #         {"text": "", "creator_id": "eval_bad_empty"},
-    #         {"creator_id": "eval_bad_missing"},          # no text field at all
-    #         {"text": "word " * 50000, "creator_id": "eval_bad_huge"},
-    #         {"text": None, "creator_id": "eval_bad_null"},
-    #     ],
-    # },
+    {
+        "name": "bad input handling",
+        "criterion": 4,
+        "bodies": [
+            {"text": "", "creator_id": "eval_empty"},
+            {"creator_id": "eval_missing"},
+            {"text": "test", "creator_id": "eval_1word"},
+            {"text": "hello world", "creator_id": "eval_2words"},
+            {"text": None, "creator_id": "eval_null"},
+        ],
+    },
+    {
+        "name": "appeal path logging",
+        "criterion": 3,
+        # Note: If your appeal test requires a manual submission first or specific ID tracking, 
+        # add your test text here to trigger the initial log entry.
+        "texts": [
+            "This text will be submitted to generate an ID for testing the appeal path log reliability."
+        ],
+    },
+    {
+        "name": "score spread separation",
+        "criterion": 5,
+        "texts": [
+            # 5 plain human writing samples
+            "I have plans for us, but without you, they are all meaningless.",
+            "The phrase 'I love you' for me includes several layers of meaning. It includes 'I miss you, love'. It also means 'Good morning' if sent or said in the morning. And it also means 'Good night, sweet drams' if send or said at night.",
+            "Quick reminder: the fastest way to reduce stress with work is finishing the work.",
+            "People say that money goes then comes back. But I think my money has Alzheimer's. It forgot to return.",
+            "They say I was born from the stage, but I was actually born at the hospital.",
+            # 5 GPT-2 generated text prompts
+            "The implementation of the proposed framework requires careful consideration of several key factors.",
+            "Furthermore, it is important to analyze the overarching systemic implications comprehensively.",
+            "In conclusion, the data demonstrates a statistically significant correlation between variables.",
+            "Optimization algorithms facilitate enhanced performance across diverse computational workloads.",
+            "This methodology establishes a robust paradigm for scalable enterprise architecture deployment."
+        ],
+    }
 
     # TODO: add what your remaining criteria need.
     #

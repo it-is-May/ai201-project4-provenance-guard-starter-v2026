@@ -94,7 +94,9 @@ Feeding micro-lengths or empty strings into the GPT-2 tokenizer causes math erro
 **Why this target:**
 If my `detector.py` perplexity score and `stylometry.py` features don't create a clean mathematical separation between human and machine patterns, the default threshold of 0.78 will constantly misclassify text, making the system unviable.
 
-
+> **Revised criterion**: At least a 0.40 mean score gap between a benchmark set of 5 plain human writing samples and 5 default GPT-2 generated text prompts.
+>
+>**Why revised**: The original phrasing used undefined "calibration inputs," making it impossible for a reader to measure. Specifying countable sets of human and AI samples makes the score gap fully reproducible.
 ---
 
 <!-- ─────────────────────────────────────────────────────────────────────────
