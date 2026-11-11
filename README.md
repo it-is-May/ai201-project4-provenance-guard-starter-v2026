@@ -675,7 +675,17 @@ that produced it:
 
      Look for a pattern. Five failures on one signal is one problem, not five. -->
 
+Criterion #5 Miss (Score Spread Separation)
+- **Stage:** The combining rule and signal two (`scoring.py::combine_signals` and `stylometry.py`).
+- **Mechanism:** The strict split threshold ($0.15$) and safety override mechanism default ambiguous text scores toward the lower, human-safe bound. This compresses the score distribution across both sets, resulting in a mean score gap of 0.325 rather than the targeted 0.40.
 
+Criterion #3 Unmeasurable (Appeal Path Logging)
+- **Stage:** The test harness and route (`run_eval.py` and `app.py::appeal`).
+- **Mechanism:** The automated evaluation script only submits text to the `/submit` endpoint in a single step and lacks the multi-step flow required to trigger and test the `POST /appeal` endpoint, rendering the criterion unmeasurable by the harness.
+
+Broken Attacks (MF02, RQ03, RQ04, RQ05, RQ07, RQ12 — HTTP 500 Errors)
+- **Stage:** The route (`app.py::submit`).
+- **Mechanism:** Non-string payloads (such as single characters, numbers, lists, `null` values, arrays, and deeply nested objects) bypassed input type validation. When text feature extraction and signal functions attempted to process these invalid data types, unhandled Python exceptions crashed the Flask application, resulting in a 500 server error instead of a clean 400 bad request.
 
 ---
 
