@@ -1115,4 +1115,20 @@ I choose to bias the system toward protecting human writers by keeping safety ov
 
 ---
 
+## Capstone
+
+**The System:** Provenance Guard (Pair 4)
+
+**The Shape:** B — Harden against failure
+
+**What's New:**
+I am hardening the `/submit` endpoint input validation to fix unhandled 500 server errors. This includes enforcing strict type checks on incoming payloads (ensuring `text` is a string before calling `.strip()`), catching non-string or malformed inputs (`null`, numbers, lists, dictionaries) to return proper `400 Bad Request` responses, and wrapping library-level model exceptions (`ValueError`, `DetectorUnavailable`) so they fail cleanly instead of crashing the process.
+
+**What's Out of Scope:**
+* I am NOT adding a third scoring signal or modifying the GPT-2 model perplexity calculations.
+* I am NOT rewriting the core 50/50 score combination rules or label thresholds.
+* I am NOT rebuilding the interface or creating new API routes.
+
+---
+
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
