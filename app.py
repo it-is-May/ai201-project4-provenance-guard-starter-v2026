@@ -188,6 +188,20 @@ def submit():
         audit.log_rejection(creator_id=creator_id, reason="text_too_short")
         return jsonify({"error": "bad_request", "message": "Text must contain at least 3 words."}), 400
 
+    # 4. Generate unique content ID
+    content_id = str(uuid.uuid4())
+
+    # 5. Call signals with error handling to prevent 500 crashes
+    try:
+        model_score = detector.model_signal(cleaned_text)
+    except ValueError as exc:
+        audit.log_rejection(creator_id=creator_id, reason="unscoreable_text")
+        return jsonify({"error": "bad_request", "message": str(exc)}), 400
+    except detector.DetectorUnavailable as exc:
+        audit.log_rejection(creator_id=creator_id, reason="detector_unavailable")
+        return jsonify({"error": "service_unavailable", "message": str(exc)}), 503
+
+    style_score = stylometry.style_signal(cleaned_text)
 
 @app.post("/appeal")
 def appeal():
