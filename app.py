@@ -156,6 +156,9 @@ def health():
 @app.post("/submit")
 @limiter.limit(f"{config.RATE_LIMIT_PER_MINUTE}/minute;{config.RATE_LIMIT_PER_DAY}/day")
 def submit():
+    """
+    Take a piece of text, validate it safely, decide about it, log the decision, answer
+    """
     # 1. Validate that the incoming body is a valid JSON dictionary
     raw_payload = request.get_json(silent=True)
     if not isinstance(raw_payload, dict):
@@ -202,6 +205,35 @@ def submit():
         return jsonify({"error": "service_unavailable", "message": str(exc)}), 503
 
     style_score = stylometry.style_signal(cleaned_text)
+
+    # 6. Combine scores, map labels, and compute word count
+    combined_score = scoring.combine_signals(model_score, style_score)
+    guess, label = scoring.score_to_label(combined_score)
+    word_count = len(cleaned_text.split())
+
+    # 7. Log decision to audit trail
+    audit.log_decision(
+        content_id=content_id,
+        creator_id=creator_id,
+        guess=guess,
+        model_score=model_score,
+        style_score=style_score,
+        combined_score=combined_score,
+        label=label,
+        status="decided",
+        word_count=word_count,
+    )
+
+    # 8. Return structured JSON response
+    return jsonify({
+        "content_id": content_id,
+        "guess": guess,
+        "confidence": 0.0,
+        "label": label,
+        "model_score": model_score,
+        "style_score": style_score,
+        "combined_score": combined_score,
+    })
 
 @app.post("/appeal")
 def appeal():
