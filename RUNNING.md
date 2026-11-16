@@ -77,6 +77,15 @@ curl -X POST http://127.0.0.1:5000/submit \
   -H "Content-Type: application/json" \
   -d '{"text": "some writing", "creator_id": "me"}'
 ```
+OR
+
+> **On Windows, keep it on one line, and escape all inner double quotes (`\"`).**
+>
+> PowerShell strips unescaped double quotes before passing arguments to external commands. Escape every double quote inside the `-d '...'` JSON payload:
+>
+```powershell
+curl.exe -X POST http://127.0.0.1:5000/submit -H "Content-Type: application/json" -d '{\"text\": \"some writing\", \"creator_id\": \"me\"}'
+```
 
 It returns a `501` saying it isn't built yet. **That's the correct starting
 position.**
