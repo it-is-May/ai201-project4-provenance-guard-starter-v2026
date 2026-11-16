@@ -1,5 +1,7 @@
 # Running Provenance Guard
 
+**Chosen Path:** Path B (Local execution with audit logs)
+
 Everything about how the starter works.
 
 This is a **web service**. It runs on your machine and you talk to it with
