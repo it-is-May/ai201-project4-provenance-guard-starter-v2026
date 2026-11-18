@@ -1524,6 +1524,16 @@ These ten entries are real lines from `logs/audit.jsonl`. The four from 2026-11-
 ]
 ```
 
+**Diagnoses — Before**
+
+*Criterion 9: MISSED (4 of 5 in all three trials)*
+
+- **Stage:** the route, `app.py::appeal`.
+- **Mechanism:** `/appeal` starts with `payload = request.get_json(silent=True) or {}`. For the body `["a"]`, `get_json` returns the list `["a"]`. The `or {}` only swaps in an empty dictionary when the value is empty or `None`, and a list with an item in it isn't empty, so `payload` stays a list. The next line calls `payload.get("content_id")`, and lists have no `.get`, so Python raises `AttributeError: 'list' object has no attribute 'get'`. Nothing catches it, so the service returns a 500 instead of a 400.
+- **Why it got through:** when I hardened `/submit`, I added an `isinstance(..., dict)` check at the top. I didn't add the same check to `/appeal`. Rows 1 to 4 passed because an empty body, a missing `content_id`, and a wrong-type or unknown `content_id` are all handled further down.
+
+**Pattern:** one miss, one cause. The hardening covered `/submit` only.
+
 ---
 
 📖 **How to run this project: [RUNNING.md](RUNNING.md)**
