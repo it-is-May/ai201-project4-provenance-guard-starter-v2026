@@ -241,6 +241,11 @@ def appeal():
     A writer says you got it wrong.
     """
     payload = request.get_json(silent=True) or {}
+    if not isinstance(payload, dict):
+        return jsonify({
+            "error": "bad_request",
+            "message": "Request body must be a JSON object."
+        }), 400
     content_id = payload.get("content_id")
     reasoning = payload.get("reasoning", "")
 
