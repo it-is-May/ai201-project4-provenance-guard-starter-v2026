@@ -1131,10 +1131,10 @@ I am hardening the `/submit` endpoint input validation to fix unhandled 500 serv
 
 **Instrumentation**
 
-Every request to `/submit` and `/appeal` appends a single-line JSON record to `audit.jsonl`. Depending on whether the input passes validation, a record follows one of two schemas:
+Every request to `/submit` appends a single-line JSON record to `audit.jsonl`, and so does every valid appeal to `/appeal` (an `event: "appeal"` record with `status: "under_review"`). Appeals that are malformed or name an unknown `content_id` currently return 400 or 404 without writing a record. Depending on whether a `/submit` input passes validation, its record follows one of two schemas:
 
 * **Accepted & Scored Records (`status: "decided"`):** Records `timestamp`, `content_id` (UUID), `creator_id`, `guess` (`human`, `ai`, or `unsure`), `model_score`, `style_score`, `combined_score`, `label`, `status`, and `word_count`.
-* **Blocked & Malformed Records (`status: "rejected"`):** Records `timestamp`, `creator_id` (defaults to `"unknown"` if the payload is not a valid JSON object), `event` (`"rejected"`), `status` (`"rejected"`), and the validation `reason` (e.g., `invalid_json_body`, `invalid_text_type`, `text_too_short`, `empty_text`, or `rate_limited`).
+* **Blocked & Malformed Records (`status: "rejected"`):** Records `timestamp`, `creator_id` (defaults to `"unknown"` if the payload is not a valid JSON object), `event` (`"rejected"`), `status` (`"rejected"`), and the `reason`: `invalid_json_body`, `missing_text`, `invalid_text_type`, `empty_text`, `text_too_short`, `unscoreable_text`, `detector_unavailable`, or `rate_limited`.
 
 Sample entries from `audit.jsonl`:
 
@@ -1151,10 +1151,12 @@ Sample entries from `audit.jsonl`:
 {"timestamp": "2026-11-16T21:36:02+00:00", "creator_id": "ms3_eval_RQ03", "event": "rejected", "status": "rejected", "reason": "invalid_text_type"}
 ```
 
+These ten entries are real lines from `logs/audit.jsonl`. The four from 2026-11-15 came from my functional tests of `/submit`. The `ms3_eval_EV` entries came from the 10-request timing loop with valid text, and the `ms3_eval_RQ` entries came from the 10-request timing loop for rejected requests (see below). That second loop sent `{"text": null}` in every request, so `ms3_eval_RQ01` to `RQ03` all show `invalid_text_type`. They do not represent three different malformed cases, despite their IDs.
+
 **What It Costs**
 
-* **Measured Cost per Run:** **$0.00** in API spend (models run locally on CPU) and **2.595 seconds** of compute time per valid `/submit` request. Rejected malformed requests average **0.035 seconds** because input guardrails block them before model inference runs.
-* **How It Was Measured:** Timed 10 consecutive `POST /submit` requests sequentially via PowerShell (`Measure-Command`) against the local Flask server (`http://127.0.0.1:5000`), once using 10 valid text samples from `attack_set` (`25.95s` total / 10 = `2.595s` avg) and once using 10 malformed payloads (`0.35s` total / 10 = `0.035s` avg).
+* **Measured Cost per Run:** **$0.00** in API spend (models run locally on CPU) and **2.595 seconds** of compute time per valid `/submit` request. Rejected requests (tested with `text` set to `null`) average **0.035 seconds** because input guardrails block them before model inference runs.
+* **How It Was Measured:** Timed 10 consecutive `POST /submit` requests sequentially via PowerShell (`Measure-Command`) against the local Flask server (`http://127.0.0.1:5000`), once using the first 10 rows of `attack_set/attacks.csv` (EV01 to EV10, valid text: `25.95s` total / 10 = `2.595s` avg) and once using 10 requests whose `text` field was `null`. The malformed-request CSV has no `text` column, so each of those requests sent `{"text": null}` and was rejected with `invalid_text_type` (`0.35s` total / 10 = `0.035s` avg). That second figure therefore measures one kind of rejection, not ten different malformed inputs.
 
 ---
 
