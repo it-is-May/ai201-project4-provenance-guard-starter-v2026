@@ -1054,32 +1054,6 @@ The improvement did not change any diagnosed issues. I am stopping because of ti
      Say which way you'd go and WHO PAYS FOR IT. -->
 I choose to bias the system toward protecting human writers by keeping safety overrides strict, even though it allows more AI text to slip through the unsure band. In this trade-off, platform readers and downstream consumers pay the price by occasionally seeing unflagged AI text, rather than forcing innocent human writers to pay the price through false accusations.
 
----
-
-## How I Used AI
-
-**Moment 1**
-
-- *What I asked for:* Assistance in setting up the initial stylometry function to calculate sentence length variance and type-token ratio.
-- *What came back:* A snippet utilizing standard string splitting and basic statistical variance calculations.
-- *What I changed:* Adjusted the tokenization logic to properly handle punctuation and edge cases with short sentences so it doesn't throw division-by-zero errors.
-
-**Moment 2**
-
-- *What I asked for:* Guidance on structuring the `/appeal` endpoint error handling when a `content_id` cannot be found in the audit log.
-- *What came back:* A conditional check using `audit.entries_for(content_id)` and returning a 404 response.
-- *What I changed:* Added extraction of the original `creator_id` from the log entry to fulfill the signature requirement of `audit.log_appeal()`.
-
-**Moment 3**
-- *What I asked for:* Computation and analysis of the mean score gaps across evaluation runs to determine why adjusting the split threshold from 0.15 to 0.18 failed to shift the metrics.
-- *What came back:* Quantitative calculations of the score distributions and score gaps, revealing that individual divergences clustered either well below or far outside the threshold window.
-- *What I changed:* Used those exact calculated metrics to document the threshold limitations in my evaluation notes, explaining why minor adjustments couldn't bridge the gap toward the 0.40 target.
-
-**Moment 4**
-- *What I asked for:* A comparative analysis of multiple attack run logs (`attack_run_2026-11-09_1817_before.md` and subsequent after-runs) to evaluate service stability across 56 test cases.
-- *What came back:* A breakdown showing that HTTP statuses, guesses, model scores, style scores, and labels remained identical, while only timestamps, execution dates, and unique content ID UUIDs changed.
-- *What I changed:* Documented the exact behavior of the 56 attacks across categories (evasion, false positives, prompt injections, malformed inputs, and floods) to separate true failures from metadata variations.
-
 <!-- ═════════════════════════════════════════════════════════════════════
 
      SUBMISSION CHECKLIST — unit 7
@@ -1129,6 +1103,12 @@ I am hardening the `/submit` endpoint input validation to fix unhandled 500 serv
 * I am NOT rewriting the core 50/50 score combination rules or label thresholds.
 * I am NOT rebuilding the interface or creating new API routes.
 
+**Running It**
+
+I chose **Path B: local execution with audit logs**. Setup and every command are in [RUNNING.md](RUNNING.md). In short, run `python app.py` in one terminal and send requests from another (or run `python run_capstone_eval.py`).
+
+I did not host it because the model does not fit a free host: `torch` (200 to 800 MB) plus the `gpt2` weights (about 550 MB) are more than the 512 MB a free tier gives, and the download would repeat after every idle spin-down. These figures come from RUNNING.md, not from my own measurement.
+
 **Instrumentation**
 
 Every request to `/submit` appends a single-line JSON record to `audit.jsonl`, and so does every valid appeal to `/appeal` (an `event: "appeal"` record with `status: "under_review"`). Appeals that are malformed or name an unknown `content_id` currently return 400 or 404 without writing a record. Depending on whether a `/submit` input passes validation, its record follows one of two schemas:
@@ -1157,8 +1137,11 @@ These ten entries are real lines from `logs/audit.jsonl`. The four from 2026-11-
 
 * **Measured Cost per Run:** **$0.00** in API spend (models run locally on CPU) and **2.595 seconds** of compute time per valid `/submit` request. Rejected requests (tested with `text` set to `null`) average **0.035 seconds** because input guardrails block them before model inference runs.
 * **How It Was Measured:** Timed 10 consecutive `POST /submit` requests sequentially via PowerShell (`Measure-Command`) against the local Flask server (`http://127.0.0.1:5000`), once using the first 10 rows of `attack_set/attacks.csv` (EV01 to EV10, valid text: `25.95s` total / 10 = `2.595s` avg) and once using 10 requests whose `text` field was `null`. The malformed-request CSV has no `text` column, so each of those requests sent `{"text": null}` and was rejected with `invalid_text_type` (`0.35s` total / 10 = `0.035s` avg). That second figure therefore measures one kind of rejection, not ten different malformed inputs.
+* **At 100 runs a day** (the daily cap in my rate limit): API spend is 100 x $0.00 = **$0.00**. Compute time using my measured average is 100 x 2.595 s = 259.5 s, about **4.3 minutes** of CPU a day. That average may include the model loading on its first request (RUNNING.md says the first submission takes 10+ seconds and later ones a second or two), but I did not check whether it did. In my later runs a warm request took about 0.1 to 0.2 seconds (the `warmup_seconds` values in the results files), which would be about **15 seconds** a day. I did not repeat the 10-request timing loop, so I report 2.595 s as my measurement and give the warm-request figure as a possible lower value.
 
-**Capstone Run Log and Verdicts — Before**
+**Run Log and Verdicts**
+
+This is the run before the fix. The second run, after the fix, is under **The Improvement**.
 
 - Produced by: `run_capstone_eval.py::main` (criteria 6 and 7: `criteria_6_and_7`, 8: `criterion_8`, 9: `criterion_9`, 10: `criterion_10`)
 - Service: `app.py::submit` and `app.py::appeal`
@@ -1524,7 +1507,7 @@ These ten entries are real lines from `logs/audit.jsonl`. The four from 2026-11-
 ]
 ```
 
-**Diagnoses — Before**
+**Diagnoses**
 
 *Criterion 9: MISSED (4 of 5 in all three trials)*
 
@@ -1533,6 +1516,437 @@ These ten entries are real lines from `logs/audit.jsonl`. The four from 2026-11-
 - **Why it got through:** when I hardened `/submit`, I added an `isinstance(..., dict)` check at the top. I didn't add the same check to `/appeal`. Rows 1 to 4 passed because an empty body, a missing `content_id`, and a wrong-type or unknown `content_id` are all handled further down.
 
 **Pattern:** one miss, one cause. The hardening covered `/submit` only.
+
+**The Improvement**
+
+**What I changed:** one check at the top of `/appeal` in `app.py` (commit `e21030e`). Right after it reads the request body, `/appeal` now checks that the body is a JSON object. If it is not (for example a list like `["a"]`), it returns a 400 with the message "Request body must be a JSON object." before it touches `content_id`.
+
+**Which diagnosis pointed at it:** criterion 9. `/appeal` called `payload.get(...)` on a list because `or {}` only replaces an empty value, and `/submit` already had this check. I changed nothing else.
+
+**Run Log and Verdicts — After**
+
+- Produced by: `run_capstone_eval.py::main` (criteria 6 and 7: `criteria_6_and_7`, 8: `criterion_8`, 9: `criterion_9`, 10: `criterion_10`), the same script and the same inputs as the first run
+- 3 trials per criterion, nothing changed between them · 2026-11-17 23:00 · full output of all 3 trials: `results/capstone_run_2026-11-17_2300_after.md`
+
+| Criterion | Target | Run 1 | Run 2 | Run 3 | Verdict |
+|---|---|---|---|---|---|
+| 6. malformed requests: right status | 12 of 12 requests return their expected status | 12/12 | 12/12 | 12/12 | MET |
+| 7. refusals: right log reason | 10 of 10 refused requests log the expected reason | 10/10 | 10/10 | 10/10 | MET |
+| 8. odd text never crashes | 6 of 6 texts return 200 or 400 (never 500) | 6/6 | 6/6 | 6/6 | MET |
+| 9. bad /appeal gets a clean answer | 5 of 5 bad appeals return their expected status | 5/5 | 5/5 | 5/5 | MET |
+| 10. 20,000-word text: 200 within 10 s | 200 within 10 seconds | PASS (200, 3.015s) | PASS (200, 0.751s) | PASS (200, 1.294s) | MET |
+
+**Real output from trial 1**, one block per criterion, pasted from the results file. The script cuts each saved response at 300 characters.
+
+*Criterion 6: malformed requests: right status* — produced by `run_capstone_eval.py::criteria_6_and_7`
+
+```json
+[
+  {
+    "id": "RQ01",
+    "expected_status": 400,
+    "status": 400,
+    "ok": true,
+    "response": "{\n  \"error\": \"bad_request\",\n  \"message\": \"Missing required 'text' field.\"\n}\n"
+  },
+  {
+    "id": "RQ02",
+    "expected_status": 200,
+    "status": 200,
+    "ok": true,
+    "response": "{\n  \"combined_score\": 0.2395,\n  \"confidence\": 0.0,\n  \"content_id\": \"f8e59e6c-e5b2-4b39-bee8-8de96b3d0074\",\n  \"guess\": \"human\",\n  \"label\": \"We think this was probably written by a person.\",\n  \"model_score\": 0.2395,\n  \"style_score\": 0.5758\n}\n"
+  },
+  {
+    "id": "RQ03",
+    "expected_status": 400,
+    "status": 400,
+    "ok": true,
+    "response": "{\n  \"error\": \"bad_request\",\n  \"message\": \"'text' must be a string.\"\n}\n"
+  },
+  {
+    "id": "RQ04",
+    "expected_status": 400,
+    "status": 400,
+    "ok": true,
+    "response": "{\n  \"error\": \"bad_request\",\n  \"message\": \"'text' must be a string.\"\n}\n"
+  },
+  {
+    "id": "RQ05",
+    "expected_status": 400,
+    "status": 400,
+    "ok": true,
+    "response": "{\n  \"error\": \"bad_request\",\n  \"message\": \"'text' must be a string.\"\n}\n"
+  },
+  {
+    "id": "RQ06",
+    "expected_status": 200,
+    "status": 200,
+    "ok": true,
+    "response": "{\n  \"combined_score\": 0.0492,\n  \"confidence\": 0.0,\n  \"content_id\": \"8367de07-c0cf-4baa-a315-bfa90ca0464c\",\n  \"guess\": \"human\",\n  \"label\": \"We think this was probably written by a person.\",\n  \"model_score\": 0.0492,\n  \"style_score\": 0.5259\n}\n"
+  },
+  {
+    "id": "RQ07",
+    "expected_status": 400,
+    "status": 400,
+    "ok": true,
+    "response": "{\n  \"error\": \"bad_request\",\n  \"message\": \"Request body must be a JSON object.\"\n}\n"
+  },
+  {
+    "id": "RQ08",
+    "expected_status": 400,
+    "status": 400,
+    "ok": true,
+    "response": "{\n  \"error\": \"bad_request\",\n  \"message\": \"Request body must be a JSON object.\"\n}\n"
+  },
+  {
+    "id": "RQ09",
+    "expected_status": 400,
+    "status": 400,
+    "ok": true,
+    "response": "{\n  \"error\": \"bad_request\",\n  \"message\": \"Request body must be a JSON object.\"\n}\n"
+  },
+  {
+    "id": "RQ10",
+    "expected_status": 400,
+    "status": 400,
+    "ok": true,
+    "response": "{\n  \"error\": \"bad_request\",\n  \"message\": \"Request body must be a JSON object.\"\n}\n"
+  },
+  {
+    "id": "RQ11",
+    "expected_status": 400,
+    "status": 400,
+    "ok": true,
+    "response": "{\n  \"error\": \"bad_request\",\n  \"message\": \"Request body must be a JSON object.\"\n}\n"
+  },
+  {
+    "id": "RQ12",
+    "expected_status": 400,
+    "status": 400,
+    "ok": true,
+    "response": "{\n  \"error\": \"bad_request\",\n  \"message\": \"'text' must be a string.\"\n}\n"
+  }
+]
+```
+
+*Criterion 7: refusals: right log reason* — produced by `run_capstone_eval.py::criteria_6_and_7`
+
+```json
+[
+  {
+    "id": "RQ01",
+    "expected_reason": "missing_text",
+    "reason": "missing_text",
+    "new_line": true,
+    "ok": true,
+    "newest_log_line": {
+      "creator_id": "attacker_RQ01",
+      "event": "rejected",
+      "reason": "missing_text",
+      "status": "rejected",
+      "timestamp": "2026-11-18T04:47:35+00:00"
+    }
+  },
+  {
+    "id": "RQ03",
+    "expected_reason": "invalid_text_type",
+    "reason": "invalid_text_type",
+    "new_line": true,
+    "ok": true,
+    "newest_log_line": {
+      "creator_id": "attacker_RQ03",
+      "event": "rejected",
+      "reason": "invalid_text_type",
+      "status": "rejected",
+      "timestamp": "2026-11-18T04:48:04+00:00"
+    }
+  },
+  {
+    "id": "RQ04",
+    "expected_reason": "invalid_text_type",
+    "reason": "invalid_text_type",
+    "new_line": true,
+    "ok": true,
+    "newest_log_line": {
+      "creator_id": "attacker_RQ04",
+      "event": "rejected",
+      "reason": "invalid_text_type",
+      "status": "rejected",
+      "timestamp": "2026-11-18T04:48:17+00:00"
+    }
+  },
+  {
+    "id": "RQ05",
+    "expected_reason": "invalid_text_type",
+    "reason": "invalid_text_type",
+    "new_line": true,
+    "ok": true,
+    "newest_log_line": {
+      "creator_id": "attacker_RQ05",
+      "event": "rejected",
+      "reason": "invalid_text_type",
+      "status": "rejected",
+      "timestamp": "2026-11-18T04:48:30+00:00"
+    }
+  },
+  {
+    "id": "RQ07",
+    "expected_reason": "invalid_json_body",
+    "reason": "invalid_json_body",
+    "new_line": true,
+    "ok": true,
+    "newest_log_line": {
+      "creator_id": "unknown",
+      "event": "rejected",
+      "reason": "invalid_json_body",
+      "status": "rejected",
+      "timestamp": "2026-11-18T04:48:56+00:00"
+    }
+  },
+  {
+    "id": "RQ08",
+    "expected_reason": "invalid_json_body",
+    "reason": "invalid_json_body",
+    "new_line": true,
+    "ok": true,
+    "newest_log_line": {
+      "creator_id": "unknown",
+      "event": "rejected",
+      "reason": "invalid_json_body",
+      "status": "rejected",
+      "timestamp": "2026-11-18T04:49:09+00:00"
+    }
+  },
+  {
+    "id": "RQ09",
+    "expected_reason": "invalid_json_body",
+    "reason": "invalid_json_body",
+    "new_line": true,
+    "ok": true,
+    "newest_log_line": {
+      "creator_id": "unknown",
+      "event": "rejected",
+      "reason": "invalid_json_body",
+      "status": "rejected",
+      "timestamp": "2026-11-18T04:49:22+00:00"
+    }
+  },
+  {
+    "id": "RQ10",
+    "expected_reason": "invalid_json_body",
+    "reason": "invalid_json_body",
+    "new_line": true,
+    "ok": true,
+    "newest_log_line": {
+      "creator_id": "unknown",
+      "event": "rejected",
+      "reason": "invalid_json_body",
+      "status": "rejected",
+      "timestamp": "2026-11-18T04:49:35+00:00"
+    }
+  },
+  {
+    "id": "RQ11",
+    "expected_reason": "invalid_json_body",
+    "reason": "invalid_json_body",
+    "new_line": true,
+    "ok": true,
+    "newest_log_line": {
+      "creator_id": "unknown",
+      "event": "rejected",
+      "reason": "invalid_json_body",
+      "status": "rejected",
+      "timestamp": "2026-11-18T04:49:48+00:00"
+    }
+  },
+  {
+    "id": "RQ12",
+    "expected_reason": "invalid_text_type",
+    "reason": "invalid_text_type",
+    "new_line": true,
+    "ok": true,
+    "newest_log_line": {
+      "creator_id": "attacker_RQ12",
+      "event": "rejected",
+      "reason": "invalid_text_type",
+      "status": "rejected",
+      "timestamp": "2026-11-18T04:50:01+00:00"
+    }
+  }
+]
+```
+
+*Criterion 8: odd text never crashes* — produced by `run_capstone_eval.py::criterion_8`
+
+```json
+[
+  {
+    "n": 1,
+    "text": "https://example.com https://example.org https://example.net",
+    "status": 200,
+    "ok": true,
+    "response": "{\n  \"combined_score\": 0.5333,\n  \"confidence\": 0.0,\n  \"content_id\": \"84fa855e-a91a-4bf6-bec3-659282419c09\",\n  \"guess\": \"unsure\",\n  \"label\": \"We found mixed signals in this text, and we're not sure who wrote it. If this was flagged by mistake, you can submit an appeal for human review.\",\n  \"model_scor"
+  },
+  {
+    "n": 2,
+    "text": "http://a.b/c?d=1 https://x.y/z#w http://localhost:5000/log",
+    "status": 200,
+    "ok": true,
+    "response": "{\n  \"combined_score\": 0.4017,\n  \"confidence\": 0.0,\n  \"content_id\": \"e8d78602-f28f-4ecc-8252-c3993d6b55c3\",\n  \"guess\": \"unsure\",\n  \"label\": \"We found mixed signals in this text, and we're not sure who wrote it. If this was flagged by mistake, you can submit an appeal for human review.\",\n  \"model_scor"
+  },
+  {
+    "n": 3,
+    "text": "3 14 159 265 358",
+    "status": 200,
+    "ok": true,
+    "response": "{\n  \"combined_score\": 0.0005,\n  \"confidence\": 0.0,\n  \"content_id\": \"9b0ba68b-a067-487a-bb0e-84f5860cde34\",\n  \"guess\": \"human\",\n  \"label\": \"We think this was probably written by a person.\",\n  \"model_score\": 0.0005,\n  \"style_score\": 0.6\n}\n"
+  },
+  {
+    "n": 4,
+    "text": "1,000,000 2,500.75 -42 0.001",
+    "status": 200,
+    "ok": true,
+    "response": "{\n  \"combined_score\": 0.4,\n  \"confidence\": 0.0,\n  \"content_id\": \"297d909d-8767-4c05-9946-534d177d9e66\",\n  \"guess\": \"unsure\",\n  \"label\": \"We found mixed signals in this text, and we're not sure who wrote it. If this was flagged by mistake, you can submit an appeal for human review.\",\n  \"model_score\":"
+  },
+  {
+    "n": 5,
+    "text": "!!! ??? ...",
+    "status": 200,
+    "ok": true,
+    "response": "{\n  \"combined_score\": 0.0009,\n  \"confidence\": 0.0,\n  \"content_id\": \"fadd9bb9-a461-472e-94d9-dd0fbb2fdb83\",\n  \"guess\": \"human\",\n  \"label\": \"We think this was probably written by a person.\",\n  \"model_score\": 0.0009,\n  \"style_score\": 0.8\n}\n"
+  },
+  {
+    "n": 6,
+    "text": "*** @()! ^_^",
+    "status": 200,
+    "ok": true,
+    "response": "{\n  \"combined_score\": 0.0321,\n  \"confidence\": 0.0,\n  \"content_id\": \"cfa6f6ff-f359-4e16-a544-072579bdbe1d\",\n  \"guess\": \"human\",\n  \"label\": \"We think this was probably written by a person.\",\n  \"model_score\": 0.0321,\n  \"style_score\": 0.8\n}\n"
+  }
+]
+```
+
+*Criterion 9: bad /appeal gets a clean answer* — produced by `run_capstone_eval.py::criterion_9`
+
+```json
+[
+  {
+    "n": 1,
+    "sent": "(empty body)",
+    "expected_status": 400,
+    "status": 400,
+    "ok": true,
+    "response": "{\n  \"error\": \"bad_request\",\n  \"message\": \"Missing content_id.\"\n}\n"
+  },
+  {
+    "n": 2,
+    "sent": "{\"reasoning\": \"I wrote this myself\"}",
+    "expected_status": 400,
+    "status": 400,
+    "ok": true,
+    "response": "{\n  \"error\": \"bad_request\",\n  \"message\": \"Missing content_id.\"\n}\n"
+  },
+  {
+    "n": 3,
+    "sent": "{\"content_id\": \"does-not-exist\", \"reasoning\": \"x\"}",
+    "expected_status": 404,
+    "status": 404,
+    "ok": true,
+    "response": "{\n  \"error\": \"not_found\",\n  \"message\": \"No decision found for that content_id.\"\n}\n"
+  },
+  {
+    "n": 4,
+    "sent": "{\"content_id\": 12345, \"reasoning\": \"x\"}",
+    "expected_status": 404,
+    "status": 404,
+    "ok": true,
+    "response": "{\n  \"error\": \"not_found\",\n  \"message\": \"No decision found for that content_id.\"\n}\n"
+  },
+  {
+    "n": 5,
+    "sent": "[\"a\"]",
+    "expected_status": 400,
+    "status": 400,
+    "ok": true,
+    "response": "{\n  \"error\": \"bad_request\",\n  \"message\": \"Request body must be a JSON object.\"\n}\n"
+  }
+]
+```
+
+*Criterion 10: 20,000-word text: 200 within 10 s* — produced by `run_capstone_eval.py::criterion_10`
+
+```json
+[
+  {
+    "warmup_status": 200,
+    "warmup_seconds": 0.131,
+    "status": 200,
+    "seconds": 3.015,
+    "limit_seconds": 10.0,
+    "ok": true,
+    "response": "{\n  \"combined_score\": 0.9988,\n  \"confidence\": 0.0,\n  \"content_id\": \"b3cb91a5-098c-441f-bb9a-aa72befcc823\",\n  \"guess\": \"ai\",\n  \"label\": \"We think this was probably generated by an AI model. If this is an error, please file an appeal.\",\n  \"model_score\": 0.9975,\n  \"style_score\": 1.0\n}\n"
+  }
+]
+```
+
+**Did it help, and how do I know:** Yes. Criterion 9 went from 4/5 in all three trials (MISSED) to 5/5 in all three (MET). Row 5 (`["a"]`) now returns 400 with "Request body must be a JSON object." instead of a 500 with an `AttributeError`. That message is the new check's own, so it also shows the new code was running.
+
+Nothing got worse. Criteria 6, 7 and 8 returned the same statuses, log reasons and scores as before. Criterion 10 still passed, with times of 3.015, 0.751 and 1.294 seconds against 1.571, 1.498 and 0.638 before. That is ordinary variation on a laptop and not an effect of the fix, which only touches `/appeal`.
+
+Results for criteria 6 to 9 repeat exactly across trials because the service is deterministic: the same text gets the same scores. What differs between trials is the `content_id` values and the log timestamps, which is how I know each trial was a real rerun.
+
+**What the fix does not do:** a malformed appeal still leaves no record in the audit log, because `/appeal` only logs valid appeals.
+
+**What's Still Broken**
+
+I met all five criteria after the fix, so there are no remaining misses. This is what I would still change, and what I would do next.
+
+**The target I would tighten:** criterion 10 (200 within 10 seconds), to **5 seconds**. My six timings across both runs ranged from 0.638 to 3.015 seconds, so 10 seconds is more than three times my slowest result and could hide a real slowdown. 5 seconds would have passed every run and still leaves about 1.7 times my slowest one. I have not changed `criteria.md`; this is what I would do next.
+
+**The one thing I would do first:** test the 503 path, which no criterion covers. `detector.py` reads its model name from the `AI201_DETECTOR_MODEL` environment variable, so I can start the server with a model name that does not exist (in PowerShell: `$env:AI201_DETECTOR_MODEL = "no-such-model"`, then `python app.py`) and send one normal submission. The failed load should raise `DetectorUnavailable`, and `/submit` should answer 503 with `"error": "service_unavailable"` and write a log line with `reason: "detector_unavailable"`. I would also check that `/ping` still answers, repeat it three times, and count a 500, a hang, or a missing log line as a failure. I have not run this test, so I do not know whether that path works. I would do it first because it is the one failure handler I added to `/submit` that nothing has exercised.
+
+**Other weak spots I know about, left for later:**
+
+- A malformed appeal leaves no audit record, because `/appeal` only logs valid appeals.
+- There is no maximum text length. My 20,000-word test passed, but nothing stops a much larger input.
+- The rate limit counts by `creator_id`, so a script that invents new IDs gets around it, as I noted under Rate Limiting.
+
+I stopped here because of the time I had for this milestone. The 503 test also needs its own server start, so it does not fit in `run_capstone_eval.py`.
+
+**How I Used AI**
+
+**Moment 1**
+
+- *What I asked for:* Assistance in setting up the initial stylometry function to calculate sentence length variance and type-token ratio.
+- *What came back:* A snippet utilizing standard string splitting and basic statistical variance calculations.
+- *What I changed:* Adjusted the tokenization logic to properly handle punctuation and edge cases with short sentences so it doesn't throw division-by-zero errors.
+
+**Moment 2**
+
+- *What I asked for:* Guidance on structuring the `/appeal` endpoint error handling when a `content_id` cannot be found in the audit log.
+- *What came back:* A conditional check using `audit.entries_for(content_id)` and returning a 404 response.
+- *What I changed:* Added extraction of the original `creator_id` from the log entry to fulfill the signature requirement of `audit.log_appeal()`.
+
+**Moment 3**
+- *What I asked for:* Computation and analysis of the mean score gaps across evaluation runs to determine why adjusting the split threshold from 0.15 to 0.18 failed to shift the metrics.
+- *What came back:* Quantitative calculations of the score distributions and score gaps, revealing that individual divergences clustered either well below or far outside the threshold window.
+- *What I changed:* Used those exact calculated metrics to document the threshold limitations in my evaluation notes, explaining why minor adjustments couldn't bridge the gap toward the 0.40 target.
+
+**Moment 4**
+- *What I asked for:* A comparative analysis of multiple attack run logs (`attack_run_2026-11-09_1817_before.md` and subsequent after-runs) to evaluate service stability across 56 test cases.
+- *What came back:* A breakdown showing that HTTP statuses, guesses, model scores, style scores, and labels remained identical, while only timestamps, execution dates, and unique content ID UUIDs changed.
+- *What I changed:* Documented the exact behavior of the 56 attacks across categories (evasion, false positives, prompt injections, malformed inputs, and floods) to separate true failures from metadata variations.
+
+**Moment 5**
+
+- *What I asked for:* Whether `run_eval.py` could run my capstone criteria 6 to 10 or whether I needed a separate script, and then a new script to run all five criteria three times.
+- *What came back:* An explanation that `run_eval.py` only posts valid JSON to `/submit`, so it cannot send raw or malformed bodies, read the audit log, call `/appeal`, or time a request. It also wrote a new script, `run_capstone_eval.py`, with one function per criterion, 13-second spacing between `/submit` requests, and a run-log file with a column for each trial.
+- *What I changed:* I did not edit the script's code. I asked for a line-by-line walkthrough before running it, asked whether using a new script made the evaluation unfair, and kept rate limiting on with the 13-second spacing instead of switching it off. I committed the script before running it, then used it for both the before and after results.
+
+**Moment 6**
+
+- *What I asked for:* A cross-check of the log entries and cost numbers that Gemini AI had extracted into my README, to see whether they matched `logs/audit.jsonl` or were made up.
+- *What came back:* All ten sample entries matched real lines in the log. It also found that my timing loop read a `text` column that `attacks_malformed_requests.csv` does not have, so every request in the rejected-cost test sent `{"text": null}`. That means the 0.035 s figure came from ten identical requests, and the three `ms3_eval_RQ` entries all show `invalid_text_type` for the same reason.
+- *What I changed:* I reworded the cost method to say what was actually sent, added a note under the ten entries explaining where they came from, and corrected the Instrumentation section (the claim that every `/appeal` request is logged, and the list of rejection reasons). I kept the 0.035 s number and did not re-measure it.
 
 ---
 
