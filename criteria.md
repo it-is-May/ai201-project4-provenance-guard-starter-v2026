@@ -129,3 +129,71 @@ If my `detector.py` perplexity score and `stylometry.py` features don't create a
      A number you missed stays where it is, gets diagnosed, and gets a fix
      attempted. That's where the points are.
      ───────────────────────────────────────────────────────────────────────── -->
+---
+## 6. In each of 3 trials, all 12 requests in `attack_set/attacks_malformed_requests.csv`, each sent as given in its `raw_body`, `send_as` and `content_type` columns, return their expected status: 200 for RQ02 and RQ06, and 400 for the other 10 rows, with requests sent at least 13 seconds apart so no 429 occurs.
+
+(Extension: `/submit` input hardening)
+
+**Why this target:**
+Each row reaches a different branch of the checks in `app.py::submit`: a missing field, a wrong type, a body that isn't an object, unparseable JSON, an empty body, or the wrong content type. RQ02 and RQ06 check the other side, that an odd but usable request is still accepted and scored. Five of these 12 (RQ03, RQ04, RQ05, RQ07, RQ12) returned 500 before the fix, so this is the core job of the extension. I set 12 of 12 and not 11 because the 10 refused requests are turned away before the model runs, and the status for RQ02 and RQ06 comes from fixed checks too, so the same input gives the same status every time and nothing random can excuse a miss. A miss would be a kind of request the service still mishandles.
+
+It fails if any row returns a different status than listed in any trial, including any 500 or 429.
+
+---
+## 7. In each of 3 trials, right after each of the 10 refused requests in `attack_set/attacks_malformed_requests.csv` (every row except RQ02 and RQ06), the newest line from `GET /log?limit=1` has the expected `reason` for 10 of 10: `missing_text` for RQ01, `invalid_text_type` for RQ03, RQ04, RQ05 and RQ12, and `invalid_json_body` for RQ07 to RQ11, with requests sent at least 13 seconds apart so no `rate_limited` entry appears.
+
+(Extension: rejection audit trail)
+
+**Why this target:**
+Each refusal branch in `app.py::submit` writes its own reason, and the log is the only record that a request was refused at all. If a reason is wrong or missing, the audit trail misleads anyone trying to diagnose an attack. The `missing_text` branch has never appeared in `logs/audit.jsonl`, so RQ01 is the row most likely to fail. I set 10 of 10 because each reason comes from a fixed check in the code, so the same input always produces the same reason.
+
+It fails if any of the 10 rows is followed by a log line with a different reason, no new line at all, or a `rate_limited` entry, in any trial.
+
+---
+## 8. In each of 3 trials, all 6 text inputs listed below return status 200 or 400 and never 500, when each is sent as the `text` field of a JSON body (`Content-Type: application/json`) to `POST /submit` at least 13 seconds apart.
+
+| # | Category | Exact text |
+|---|---|---|
+| 1 | URLs only | `https://example.com https://example.org https://example.net` |
+| 2 | URLs only | `http://a.b/c?d=1 https://x.y/z#w http://localhost:5000/log` |
+| 3 | Numbers only | `3 14 159 265 358` |
+| 4 | Numbers only | `1,000,000 2,500.75 -42 0.001` |
+| 5 | No letters, 3+ words | `!!! ??? ...` |
+| 6 | No letters, 3+ words | `*** @()! ^_^` |
+
+(Extension: model and style steps don't crash)
+
+**Why this target:**
+All six inputs have at least 3 words, so they pass the length check in `app.py::submit` and reach the model and `style_signal`. Only the model call is wrapped in `try/except`, so `style_signal` is the step where an unexpected text could cause an unhandled crash and a 500. These are my own inputs, not from the attack set, so they test things I haven't tried. I accept either 200 or 400 because both are clean answers, and a 500 is the only outcome that means the service crashed. I set 6 of 6 because a crash on any one is a kind of text a real writer could paste, and the status code doesn't depend on the model's randomness, only the scores do.
+
+It fails if any input returns anything other than 200 or 400 in any trial, including 500, 503 or 429.
+
+---
+## 9. In each of 3 trials, all 5 bad `POST /appeal` requests listed below, each sent with `Content-Type: application/json`, return the status shown for each row: 400 (bad request) for rows 1, 2 and 5, and 404 (not found) for rows 3 and 4, with no 500.
+
+| # | Request body | Expected status |
+|---|---|---|
+| 1 | (empty body) | 400 |
+| 2 | `{"reasoning": "I wrote this myself"}` (no `content_id`) | 400 |
+| 3 | `{"content_id": "does-not-exist", "reasoning": "x"}` | 404 |
+| 4 | `{"content_id": 12345, "reasoning": "x"}` | 404 |
+| 5 | `["a"]` (a JSON array, not an object) | 400 |
+
+(Bad input on `/appeal`)
+
+**Why this target:**
+`/appeal` is the only way a writer can challenge a decision, so if a malformed request crashes it, a wrongly accused writer has no recourse. I didn't harden this route when I hardened `/submit`, so it's the place I'd most expect to fail, and row 5 may return a 500 because the code calls `.get` on a list. This criterion differs from criterion 3, which checks that a valid appeal is logged. This one checks that bad appeals get a clean answer. I set 5 of 5 because each row is a different branch and the answers don't depend on the model. The route has no rate limit, so no spacing is needed.
+
+It fails if any row returns a different status than the table in any trial, including a 500.
+
+---
+## 10. In each of 3 trials, after one normal warm-up request, a single `POST /submit` whose text is the word `word` repeated 20,000 times (separated by spaces) returns status 200 within 10 seconds, measured from sending the request to receiving the full response.
+
+(Extension: huge input on `/submit`)
+
+**Why this target:**
+My detector truncates input to 400 tokens, so the model's cost shouldn't grow with input size, and a normal request takes about 2.6 seconds (from my README). 10 seconds is about four times that, which leaves room for tokenizing and style analysis of the whole text while staying well under the 30 to 60 second timeouts typical of web gateways. 20,000 words is about double the 11,330-word attack that already passed (MF08), so it tests beyond what I've tried. The service has no maximum length, so the text should simply be accepted and a 400 would be unexpected. A very large input is also where I'd expect a slowdown. The warm-up is there because the first request loads the model. It's one request per trial, so no spacing is needed. The 10 seconds comes from my laptop, so it's my baseline and not a universal number.
+
+It fails if the response is anything other than 200, or takes longer than 10 seconds, in any trial.
+
+---
